@@ -17,9 +17,9 @@ FREQ[3]=200000000
 FREQ[4]=250000000
 FREQ[5]=200000000
 FREQ[6]=200000000
-EMU_TYPE=sw_emu
-LIB_EMU_TYPE=-lxrt_swemu
-VER=2022.2
+EMU_TYPE=hw_emu
+LIB_EMU_TYPE=-lxrt_hwemu
+VER=2025.1.1
 EN_PROF=""
 PLATFORM=xilinx_u55c_gen3x16_xdma_3_202210_1
 
@@ -43,7 +43,8 @@ VITIS_HLS_KERNEL[4]="timer"
 VITIS_HLS_KERNEL[5]="pqHandler"
 VITIS_HLS_KERNEL[6]="message"
 
-VITIS_INCLUDE="/opt/xilinx/tools/Vitis_HLS/$VER/include"
+VITIS_INCLUDE="/tools/Xilinx/2025.1.1/Vitis/include"
+VITIS_ADD="/tools/Xilinx/2025.1.1/Vitis/include/etc"
 XRT_INCLUDE="/opt/xilinx/xrt/include"
 
 DATA_PATH="/home/milo168/Desktop/SAT_workspace/SAT_test_cases"
@@ -52,7 +53,7 @@ CONNECTIVITY="k2k.cfg"
 
 #TODO: YOU MUST POINT TO YOUR XRT AND VITIS_HLS INSTALL PATH
 source /opt/xilinx/xrt/setup.sh
-source /opt/xilinx/tools/Vitis_HLS/$VER/settings64.sh
+source /tools/Xilinx/2025.1.1/Vitis/settings64.sh
 
 compile_opencl(){
 	IS_HW_SIM="-DHW_SIM"
@@ -78,6 +79,7 @@ compile_opencl(){
 	-Irapid_json \
 	-I$XRT_INCLUDE \
 	-I$VITIS_INCLUDE \
+	-I$VITIS_ADD \
 	-Isrc \
 	-c $OPENCL_FILES_CPP; mv $OPENCL_FILES_OBJ obj) 
 
@@ -127,6 +129,7 @@ compile_kernel(){
 		(set -x; g++ -std=c++17 -w -O3 \
 		-I$XRT_INCLUDE \
 		-I$VITIS_INCLUDE \
+		-I$VITIS_ADD \
 		-c $VITIS_HLS_CPP_VAL; rm *.o)
 
 		if [ $? -ne 0 ]
@@ -146,6 +149,7 @@ compile_kernel(){
 		--log_dir ../_x \
 		--report_dir ../_x \
 		--include ./ \
+		--include $VITIS_ADD \
 		$extraCommands \
 		--platform $PLATFORM \
 		-s --kernel ${VITIS_HLS_KERNEL[i]} \
@@ -185,6 +189,7 @@ compile_kernel(){
 	--report_dir ../_x \
 	--config $CONNECTIVITY \
 	--include ./ \
+	--include $VITIS_ADD \
 	--platform $PLATFORM \
 	--kernel_frequency $FREQ_SC\
 	-R2 \
@@ -255,10 +260,10 @@ then
 	rm -rf _x
 	#EN_PROF="--profile.data all:all:all --profile.exec all:all"
 
-	EMU_TYPE=sw_emu
-	compile_opencl	
-	compile_kernel
-	run_program
+#	EMU_TYPE=sw_emu
+#	compile_opencl	
+#	compile_kernel
+#	run_program
 
 	EMU_TYPE=hw_emu	
 	compile_opencl
