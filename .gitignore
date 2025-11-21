@@ -1,0 +1,7 @@
+_x/
+src/bin/
+src/emconfig_out/
+src/obj/*
+!src/obj/.gitignore
+*.log
+*.swp

@@ -19,9 +19,9 @@ FREQ[5]=200000000
 FREQ[6]=200000000
 EMU_TYPE=hw_emu
 LIB_EMU_TYPE=-lxrt_hwemu
-VER=2025.1.1
+VER=2025.1
 EN_PROF=""
-PLATFORM=xilinx_u55c_gen3x16_xdma_3_202210_1
+PLATFORM=xilinx_aws-vu47p-f2_202420_2
 
 OPENCL_FILES_CPP="host.cpp xcl2.cpp"
 OPENCL_FILES_OBJ="host.o xcl2.o"
@@ -43,8 +43,8 @@ VITIS_HLS_KERNEL[4]="timer"
 VITIS_HLS_KERNEL[5]="pqHandler"
 VITIS_HLS_KERNEL[6]="message"
 
-VITIS_INCLUDE="/tools/Xilinx/2025.1.1/Vitis/include"
-VITIS_ADD="/tools/Xilinx/2025.1.1/Vitis/include/etc"
+VITIS_INCLUDE="/opt/Xilinx/2025.1/Vitis/include"
+VITIS_ADD="/opt/Xilinx/2025.1/Vitis/include/etc"
 XRT_INCLUDE="/opt/xilinx/xrt/include"
 
 DATA_PATH="/home/milo168/Desktop/SAT_workspace/SAT_test_cases"
@@ -53,7 +53,7 @@ CONNECTIVITY="k2k.cfg"
 
 #TODO: YOU MUST POINT TO YOUR XRT AND VITIS_HLS INSTALL PATH
 source /opt/xilinx/xrt/setup.sh
-source /tools/Xilinx/2025.1.1/Vitis/settings64.sh
+source /opt/Xilinx/2025.1/Vitis/settings64.sh
 
 compile_opencl(){
 	IS_HW_SIM="-DHW_SIM"
@@ -227,8 +227,8 @@ run_program(){
 if [[ $COMMAND == compilecl ]]
 then
 
-	EMU_TYPE=sw_emu
-	compile_opencl
+#	EMU_TYPE=sw_emu
+#	compile_opencl
 
 	EMU_TYPE=hw_emu
 	compile_opencl

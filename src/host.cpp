@@ -409,9 +409,15 @@ bool solve(std::string xclBinFile, std::string inputFilePath, std::string output
 		std::cout << "Trying to program device[" << i << "]: " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
         
 		#ifndef HW_SIM
-		if (device.getInfo<CL_DEVICE_NAME>() != "xilinx_u55c_gen3x16_xdma_base_3") {
+		// For real hardware: check for U55C or AWS VU47P device
+		std::string device_name = device.getInfo<CL_DEVICE_NAME>();
+		if (device_name != "xilinx_u55c_gen3x16_xdma_base_3" && 
+		    device_name.find("aws-vu47p") == std::string::npos) {
 		#else
-		if (device.getInfo<CL_DEVICE_NAME>() != "xilinx_u55c_gen3x16_xdma_3_202210_1") {
+		// For hardware emulation: check for U55C or AWS VU47P device
+		std::string device_name = device.getInfo<CL_DEVICE_NAME>();
+		if (device_name != "xilinx_u55c_gen3x16_xdma_3_202210_1" && 
+		    device_name.find("aws-vu47p") == std::string::npos) {
 		#endif
 			continue;
 		}
