@@ -2,36 +2,18 @@
 #include <ap_axi_sdata.h>
 #include <ap_utils.h>
 #include "data_structures.h"
+#include "hbm_access_helpers.h"
 
-void copyCls(ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], ap_uint<128>* clauseStore, const unsigned int clauseElements){
-    #pragma HLS inline off
-
-    unsigned int clauseElements4 = clauseElements/4;
-    if(clauseElements%4 != 0){
-        clauseElements4++;
-    }
-    COPY_CLS_STORE: for(unsigned int i = 0; i < clauseElements4; i++){
-        #pragma HLS loop_tripcount min=1024 max=1024
-        mClsStore[i] = reg(reg(reg(clauseStore[i])));
-    }
-}
+// HBM Direct Access Version - Removed URAM copy
+// Clause store is now accessed directly from HBM via AXI interface
 
 void copyCmd(clauseMetaData mCmd[_FPGA_MAX_CLAUSES], clauseMetaData* cmd, const unsigned int ORIGINAL_CLS_CNT){
     #pragma HLS inline off
     COPY_CMD: for(unsigned int i = 0; i < ORIGINAL_CLS_CNT; i++){
         #pragma HLS loop_tripcount min=1024 max=1024
+        #pragma HLS pipeline II=1
         mCmd[i] = reg(reg(cmd[i]));
     }
-}
-
-void copy_cls_data(ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], clauseMetaData mCmd[_FPGA_MAX_CLAUSES],
-    ap_uint<128>* clauseStore, clauseMetaData* cmd,
-    const unsigned int clauseElements, const unsigned int ORIGINAL_CLS_CNT){
-    #pragma HLS inline off
-    #pragma HLS dataflow
-
-    copyCmd(mCmd, cmd, ORIGINAL_CLS_CNT);
-    copyCls(mClsStore, clauseStore, clauseElements);
 }
 
 void axiStreamBuffer_sendDelete(hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream, hls::stream<ap_uint<96>>& intermediateStream){
@@ -122,9 +104,11 @@ void sendLength_wrapper(hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream,
 
 }
 
-void sendLoop(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
+void sendLoop(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE, const cls clsID, 
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream){
+    #pragma HLS inline off
+    
     unsigned int state = 0;
 
     clauseMetaData cmd;
@@ -143,8 +127,10 @@ void sendLoop(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const 
     reqAddrLit = cmd.addressStart;
 
     SEND_DATA_2: while(true){
+        #pragma HLS pipeline II=1
         if(state == 0){
-            ap_uint<128> get = mClsStore[reqAddrLit/4];
+            // Read directly from HBM instead of URAM
+            ap_uint<128> get = hbm_read_clause_element(clauseStore, reqAddrLit/4);
             tmpAddr = get.range(127,96);
             
             ap_axiu<32,0,0,0> sendData;
@@ -167,7 +153,7 @@ void sendLoop(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const 
     }
 }
 
-void sendData(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
+void sendData(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream, hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream){
     #pragma HLS inline off
@@ -182,7 +168,7 @@ void sendData(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const 
 
         cls clsID = readOne.data.range(31,0);
         
-        sendLoop(mClsStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clsID, clauseStoreOutputStream);
+        sendLoop(clauseStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clsID, clauseStoreOutputStream);
 
         ap_axiu<32,0,0,0> sendData;
         sendData.data = 0;
@@ -190,18 +176,18 @@ void sendData(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const 
     }
 }
 
-void sendData_dataflow(const ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
+void sendData_dataflow(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE, 
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1, hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream2, 
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream2){
     #pragma HLS inline off
     #pragma HLS dataflow
 
-    sendData(mClsStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clauseStoreInputStream1, clauseStoreOutputStream1);
-    sendData(mClsStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clauseStoreInputStream2, clauseStoreOutputStream2);
+    sendData(clauseStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clauseStoreInputStream1, clauseStoreOutputStream1);
+    sendData(clauseStore, mCmd, ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE, clauseStoreInputStream2, clauseStoreOutputStream2);
 }
 
-void saveData(ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+void saveData(ap_uint<128>* clauseStore,
     mmuStream<unsigned int, _MAX_PAGES_CLS_STORE_>& freeClsPageAddresses,
     const clauseMetaData cmd, const unsigned int CLAUSE_PAGE_SIZE, hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1,
     hls::stream<ap_axiu<64,0,0,0>>& locationInputStream){
@@ -218,6 +204,7 @@ void saveData(ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
     locationInputStream.write(updateLitStorePos);
 
     for(unsigned int i = 0; i < cmd.numElements; i++){
+        #pragma HLS pipeline II=1
         ap_axiu<96,0,0,0> getData = clauseStoreInputStream1.read();
 
         get.range(32*(reqAddrOffsetCls%4)+31,32*(reqAddrOffsetCls%4)) = getData.data.range(31,0);
@@ -244,7 +231,8 @@ void saveData(ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
             reqAddrOffsetCls = 0;
         }
 
-        mClsStore[tmpAddr/4] = get; 
+        // Write directly to HBM instead of URAM
+        hbm_write_clause_element(clauseStore, tmpAddr/4, get); 
 
         if(reqAddrOffsetCls%4 == 0){
             if(useNewPage){
@@ -319,14 +307,14 @@ void getDeletedClsID(hls::stream<cls>& removeIDStream,
 void deleteClauses(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID, mmuStream<unsigned int, _MAX_PAGES_CLS_STORE_>& freeClsPageAddresses,
     hls::stream<cls>& removeIDStream, hls::stream<ap_uint<96>>& intermediateStream,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
-    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore,
     const unsigned int CLAUSE_PAGE_SIZE){
 #else
 void deleteClauses(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID, mmuStream<unsigned int, _MAX_PAGES_CLS_STORE_>& freeClsPageAddresses,
     hls::stream<cls>& removeIDStream,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
-    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], 
+    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore, 
     const unsigned int CLAUSE_PAGE_SIZE){
 #endif
 
@@ -357,13 +345,15 @@ void deleteClauses(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID, mmuStream<unsig
     ap_uint<128> get = 0;
     SEND_DATA_DELETE_NO_WRAP: while(true){
         #pragma HLS loop_tripcount min=16 max=16
+        #pragma HLS pipeline II=1
 
         if(state == 0){
             if(subIndex == 0){
                 freeClsPageAddresses.write(reqAddrLit);
             }
 
-            get = mClsStore[reqAddrLit/4];
+            // Read directly from HBM instead of URAM
+            get = hbm_read_clause_element(clauseStore, reqAddrLit/4);
             tmpAddr = get.range(127,96);
 
             ap_axiu<32,0,0,0> sendData;
@@ -432,7 +422,7 @@ void delete_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
     mmuStream<unsigned int, _MAX_PAGES_CLS_STORE_>& freeClsPageAddresses,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
-    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4], 
+    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore, 
     const unsigned int removeTotal, const unsigned int CLAUSE_PAGE_SIZE){
     #pragma HLS inline off
 
@@ -447,7 +437,7 @@ void delete_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
         #ifdef FPGA_HW
         deleteClauses(freeClsID, freeClsPageAddresses, removeIDStream,
             intermediateStream, clauseStoreOutputStream1, locationInputStream,
-            mCmd, mClsStore, CLAUSE_PAGE_SIZE);
+            mCmd, clauseStore, CLAUSE_PAGE_SIZE);
         #endif
     }
 
@@ -458,7 +448,7 @@ void deleteClauses_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
     cls* usedClsIDBuckets, minimumStreamTracker tracker[_FPGA_MAX_LBD_BUCKETS], cls lastInsertedID,
-    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore,
     const unsigned int removeTotal, const unsigned int CLAUSE_PAGE_SIZE, unsigned int LBDBucketCount[_FPGA_MAX_LBD_BUCKETS]){
     #pragma HLS inline off
 
@@ -474,13 +464,13 @@ void deleteClauses_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
         freeClsPageAddresses,
         clauseStoreInputStream1,
         clauseStoreOutputStream1, locationInputStream,
-        mCmd, mClsStore, removeTotal, CLAUSE_PAGE_SIZE);
+        mCmd, clauseStore, removeTotal, CLAUSE_PAGE_SIZE);
     #else
     getDeletedClsID(removeIDStream, usedClsIDBuckets, tracker, lastInsertedID, removeTotal, LBDBucketCount);
     for(unsigned int i = 0; i < removeTotal; i++){
         deleteClauses(freeClsID, freeClsPageAddresses, removeIDStream,
             clauseStoreInputStream1, clauseStoreOutputStream1, locationInputStream,
-            mCmd, mClsStore, CLAUSE_PAGE_SIZE);
+            mCmd, clauseStore, CLAUSE_PAGE_SIZE);
     }
     #endif
 
@@ -526,8 +516,9 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
     mmuStream<cls, _FPGA_MAX_CLAUSES> freeClsID(ORIGINAL_CLS_CNT,_FPGA_MAX_CLAUSES,1);
     #pragma HLS bind_storage variable=freeClsID.array type=RAM_S2P impl=URAM latency=2
 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4];
-    #pragma HLS bind_storage variable=mClsStore type=RAM_T2P impl=URAM latency=2
+    // HBM Direct Access: Removed mClsStore URAM array
+    // Clause store is now accessed directly from HBM via clauseStore pointer
+    // This frees URAM resources for other uses
 
     clauseMetaData mCmd[_FPGA_MAX_CLAUSES];
     #pragma HLS aggregate variable=mCmd compact=auto
@@ -543,9 +534,8 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
         LBDBucketCount[1][i] = 0;
     }
 
-    copy_cls_data(mClsStore, mCmd,
-        clauseStore, cmd,
-        clauseElements, ORIGINAL_CLS_CNT);
+    // Only copy metadata, not clause store data (accessed directly from HBM)
+    copyCmd(mCmd, cmd, ORIGINAL_CLS_CNT);
 
     cls freeID;
     cls lastInsertedID;
@@ -559,7 +549,7 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
             sendLength_wrapper(clauseStoreOutputStream1, clauseStoreInputStream1, mCmd);
         }else if(code == csh::SEND_CLS){
             
-            sendData_dataflow(mClsStore, mCmd, 
+            sendData_dataflow(clauseStore, mCmd, 
                 ORIGINAL_CLS_CNT, CLAUSE_PAGE_SIZE,
                 clauseStoreInputStream1, clauseStoreInputStream2,
                 clauseStoreOutputStream1, clauseStoreOutputStream2);
@@ -581,7 +571,7 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
 
                 sendData.data = freeID;
                 clauseStoreOutputStream1.write(sendData);
-                saveData(mClsStore, freeClsPageAddresses,
+                saveData(clauseStore, freeClsPageAddresses,
                     cmd, CLAUSE_PAGE_SIZE, clauseStoreInputStream1, locationInputStream);
             }            
         }else if(code == csh::BUCKET){
@@ -606,12 +596,13 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
                 deleteClauses_wrapper(freeClsID, freeClsPageAddresses,
                     clauseStoreInputStream1, clauseStoreOutputStream1, locationInputStream,
                     usedClsIDBuckets, tracker, lastInsertedID,
-                    mCmd, mClsStore, removeTotal, CLAUSE_PAGE_SIZE, LBDBucketCount[1]);
+                    mCmd, clauseStore, removeTotal, CLAUSE_PAGE_SIZE, LBDBucketCount[1]);
             }
         }
     }
 
     WRITE_OUT_LBD_STATS: for(unsigned int i = 0; i < _FPGA_MAX_LBD_BUCKETS; i++){
+        #pragma HLS pipeline II=2
         trackLBD[i] = LBDBucketCount[0][i];
         trackLBD[i+_FPGA_MAX_LBD_BUCKETS] = LBDBucketCount[1][i];
     }

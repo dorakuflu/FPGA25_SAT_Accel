@@ -1,6 +1,8 @@
 _x/
 src/bin/
 src/emconfig_out/
+FPGArpt/
+.ipcache/
 src/obj/*
 !src/obj/.gitignore
 *.log
