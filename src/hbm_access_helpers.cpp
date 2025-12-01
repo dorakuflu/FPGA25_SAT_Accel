@@ -2,16 +2,14 @@
 
 // Helper functions for efficient HBM access
 void cache_find(
-    ap_uint<128>* hbm_clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *hbm_clauseStore,
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     unsigned int addr,
     unsigned int &found_addr,
     bool &hit)
 {
     #pragma HLS inline off
-
-    const int CACHE_SIZE = _FPGA_MAX_LITERAL_ELEMENTS/4;
 
     LOOKUP_LOOP:
     for (int i = 0; i < CACHE_SIZE; i++) {
@@ -20,46 +18,39 @@ void cache_find(
         if (clsCacheData.cache_bits[i][0] && clsCacheData.cache_tag[i] == addr) {
 	    found_addr = i;
             hit = true;
+	    break;
         }
     }
 }
 
 // Read single clause element from HBM
 ap_uint<128> hbm_read_clause_element(
-    ap_uint<128>* hbm_clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *hbm_clauseStore,
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     unsigned int addr)
 {
-    #pragma HLS inline off
+    // fully associative search
+    // cache_find(hbm_clauseStore, mClsStore, clsCacheData, addr, found_addr, hit);
 
-    bool hit = false;
-    unsigned int found_addr = 0;
+    // direct mapped search
+    unsigned int index = addr % CACHE_SIZE;
 
-    const int CACHE_SIZE = _FPGA_MAX_LITERAL_ELEMENTS/4;
-
-    cache_find(hbm_clauseStore, mClsStore, clsCacheData, addr, found_addr, hit);
-
-    if (hit) {
-        return mClsStore[found_addr];
+    if (clsCacheData.cache_bits[index][0] && clsCacheData.cache_tag[index] == addr) {
+        return mClsStore[index];
     }
 
     ap_uint<128> fetched = reg(reg(hbm_clauseStore[addr]));
 
     // writeback dirty
-    if(clsCacheData.cache_bits[clsCacheData.repl_idx][1]){
-        hbm_clauseStore[clsCacheData.cache_tag[clsCacheData.repl_idx]] = mClsStore[clsCacheData.repl_idx];
+    if(clsCacheData.cache_bits[index][1]){
+        hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
     }
 
-    mClsStore[clsCacheData.repl_idx] = fetched;
-    clsCacheData.cache_tag[clsCacheData.repl_idx]   = addr;
-    clsCacheData.cache_bits[clsCacheData.repl_idx][0] = 1;
-    clsCacheData.cache_bits[clsCacheData.repl_idx][1] = 0;
-
-    // round robin style eviction ptr
-    clsCacheData.repl_idx = (clsCacheData.repl_idx + 1);
-    if (clsCacheData.repl_idx == CACHE_SIZE) clsCacheData.repl_idx = 0;
-
+    mClsStore[index] = fetched;
+    clsCacheData.cache_tag[index]   = addr;
+    clsCacheData.cache_bits[index][0] = 1;
+    clsCacheData.cache_bits[index][1] = 0;
 
     return fetched;
 }
@@ -67,41 +58,36 @@ ap_uint<128> hbm_read_clause_element(
 
 // Write single clause element to HBM
 void hbm_write_clause_element(
-    ap_uint<128>* hbm_clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *hbm_clauseStore,
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     unsigned int addr,
-    ap_uint<128> data) {
-
-    #pragma HLS inline off
-
+    ap_uint<128> data)
+{
     bool hit = false;
-    unsigned int found_addr = 0;
 
-    const int CACHE_SIZE = _FPGA_MAX_LITERAL_ELEMENTS/4;
+    // fully associative
+    // cache_find(hbm_clauseStore, mClsStore, clsCacheData, addr, found_addr, hit);
 
-    cache_find(hbm_clauseStore, mClsStore, clsCacheData, addr, found_addr, hit);
+    // direct mapped search
+    unsigned int index = addr % CACHE_SIZE;
 
-    if (hit) {
+    if (clsCacheData.cache_bits[index][0] && clsCacheData.cache_tag[index] == addr) {
         // Cache hit: update cache, mark dirty
-        mClsStore[found_addr] = data;
-        clsCacheData.cache_bits[found_addr][1] = 1;
+        mClsStore[index] = data;
+        clsCacheData.cache_bits[index][1] = 1;
         return;
     }
 
-    if (clsCacheData.cache_bits[clsCacheData.repl_idx][1]) {
+    if (clsCacheData.cache_bits[index][1]) {
         // writeback dirty line to HBM
-        hbm_clauseStore[clsCacheData.cache_tag[clsCacheData.repl_idx]] = mClsStore[clsCacheData.repl_idx];
+        hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
     }
 
     // replace data in cache
-    mClsStore[clsCacheData.repl_idx] = data;
-    clsCacheData.cache_tag[clsCacheData.repl_idx] = addr;
-    clsCacheData.cache_bits[clsCacheData.repl_idx][0] = 1; // valid
-    clsCacheData.cache_bits[clsCacheData.repl_idx][1] = 1; // dirty
-
-    // round robin style eviction ptr
-    clsCacheData.repl_idx = (clsCacheData.repl_idx + 1);
-    if (clsCacheData.repl_idx == CACHE_SIZE) clsCacheData.repl_idx = 0;
+    mClsStore[index] = data;
+    clsCacheData.cache_tag[index] = addr;
+    clsCacheData.cache_bits[index][0] = 1; // valid
+    clsCacheData.cache_bits[index][1] = 1; // dirty
 }
 

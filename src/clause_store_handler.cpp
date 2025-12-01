@@ -535,14 +535,14 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
     // HBM Direct Access: Removed mClsStore URAM array
     // Clause store is now accessed directly from HBM via clauseStore pointer
     // This frees URAM resources for other uses
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4];
+    ap_uint<128> mClsStore[_HOST_MAX_CLAUSE_ELEMENTS];
     #pragma HLS bind_storage variable=mClsStore type=RAM_T2P impl=URAM latency=2
     
     ClsCacheData clsCacheData;
     clsCacheData.repl_idx = 0;
 
-    #pragma HLS bind_storage variable=clsCacheData.cache_tag   type=RAM_2P impl=LUTRAM
-    #pragma HLS bind_storage variable=clsCacheData.cache_bits type=RAM_2P impl=LUTRAM
+    #pragma HLS bind_storage variable=clsCacheData.cache_tag   type=RAM_2P impl=URAM
+    #pragma HLS bind_storage variable=clsCacheData.cache_bits type=RAM_2P impl=URAM
     #pragma HLS reset variable=clsCacheData.repl_idx
 
     clauseMetaData mCmd[_FPGA_MAX_CLAUSES];

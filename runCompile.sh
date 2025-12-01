@@ -28,7 +28,7 @@ OPENCL_FILES_OBJ="host.o xcl2.o"
 
 VITIS_HLS_CPP=()
 VITIS_HLS_CPP[0]="backtrack.cpp color.cpp copy_in.cpp decide.cpp discover.cpp learn.cpp minimize.cpp manage.cpp solver.cpp"
-VITIS_HLS_CPP[1]="clause_store_handler.cpp"
+VITIS_HLS_CPP[1]="clause_store_handler.cpp hbm_access_helpers.cpp"
 VITIS_HLS_CPP[2]="location_handler.cpp"
 VITIS_HLS_CPP[3]="restart.cpp"
 VITIS_HLS_CPP[4]="timer.cpp"
