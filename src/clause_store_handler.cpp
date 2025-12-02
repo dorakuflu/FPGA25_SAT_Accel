@@ -545,6 +545,14 @@ void clause_store_handler(ap_uint<128>* clauseStore, clauseMetaData* cmd,
     #pragma HLS bind_storage variable=clsCacheData.cache_bits type=RAM_2P impl=URAM
     #pragma HLS reset variable=clsCacheData.repl_idx
 
+    // CRITICAL: Initialize all cache lines to invalid state
+   INIT_CACHE: for(unsigned int i = 0; i < CACHE_SIZE; i++){
+    #pragma HLS unroll factor=8
+    clsCacheData.cache_bits[i][0] = 0;  // invalid
+    clsCacheData.cache_bits[i][1] = 0;  // clean
+    clsCacheData.cache_tag[i] = 0;
+    }
+
     clauseMetaData mCmd[_FPGA_MAX_CLAUSES];
     #pragma HLS aggregate variable=mCmd compact=auto
     #pragma HLS bind_storage variable=mCmd type=RAM_T2P impl=URAM latency=2
