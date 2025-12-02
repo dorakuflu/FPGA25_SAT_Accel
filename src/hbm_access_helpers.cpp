@@ -36,23 +36,33 @@ ap_uint<128> hbm_read_clause_element(
     // direct mapped search
     unsigned int index = addr % CACHE_SIZE;
 
+    //printf("Reading addr: %h, with cache access %h", addr, index);
+
+    ap_uint<128> get;
+
     if (clsCacheData.cache_bits[index][0] && clsCacheData.cache_tag[index] == addr) {
-        return mClsStore[index];
+	//printf("Data read: %h", mClsStore[index]);
+        get = mClsStore[index];
     }
-
-    ap_uint<128> fetched = reg(reg(hbm_clauseStore[addr]));
-
-    // writeback dirty
-    if(clsCacheData.cache_bits[index][1]){
-        hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
+    else{
+        ap_uint<128> fetched = reg(reg(hbm_clauseStore[addr]));
+    
+        // writeback dirty
+        if(clsCacheData.cache_bits[index][1]){
+	    //printf("Wrote back addr %h from line %h", clsCacheData.cache_tag[index], index);
+	    //printf("Had value of %h", mClsStore[index]);
+            hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
+        }
+    
+        mClsStore[index] = fetched;
+        clsCacheData.cache_tag[index]   = addr;
+        clsCacheData.cache_bits[index][0] = 1; // valid
+        clsCacheData.cache_bits[index][1] = 0; // dirty
+    
+        //printf("Data read: %h", fetched);
+        get = fetched;
     }
-
-    mClsStore[index] = fetched;
-    clsCacheData.cache_tag[index]   = addr;
-    clsCacheData.cache_bits[index][0] = 1;
-    clsCacheData.cache_bits[index][1] = 0;
-
-    return fetched;
+    return get;
 }
 
 
@@ -71,23 +81,27 @@ void hbm_write_clause_element(
 
     // direct mapped search
     unsigned int index = addr % CACHE_SIZE;
+    //printf("Writing addr: %h, with cache access %h", addr, index);
+    //printf("Data written: %h", data);
 
     if (clsCacheData.cache_bits[index][0] && clsCacheData.cache_tag[index] == addr) {
         // Cache hit: update cache, mark dirty
         mClsStore[index] = data;
         clsCacheData.cache_bits[index][1] = 1;
-        return;
     }
-
-    if (clsCacheData.cache_bits[index][1]) {
-        // writeback dirty line to HBM
-        hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
+    else{
+        if (clsCacheData.cache_bits[index][1]) {
+            // writeback dirty line to HBM
+	    //printf("Wrote back addr %h from line %h", clsCacheData.cache_tag[index], index);
+	    //printf("Had value of %h", mClsStore[index]);
+            hbm_clauseStore[clsCacheData.cache_tag[index]] = mClsStore[index];
+        }
+    
+        // replace data in cache
+        mClsStore[index] = data;
+        clsCacheData.cache_tag[index] = addr;
+        clsCacheData.cache_bits[index][0] = 1; // valid
+        clsCacheData.cache_bits[index][1] = 1; // dirty
     }
-
-    // replace data in cache
-    mClsStore[index] = data;
-    clsCacheData.cache_tag[index] = addr;
-    clsCacheData.cache_bits[index][0] = 1; // valid
-    clsCacheData.cache_bits[index][1] = 1; // dirty
 }
 

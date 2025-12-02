@@ -105,7 +105,7 @@ void sendLength_wrapper(hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream,
 }
 
 void sendLoop(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE, const cls clsID, 
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream){
@@ -156,7 +156,7 @@ void sendLoop(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLA
 }
 
 void sendData(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream, hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream){
@@ -181,7 +181,7 @@ void sendData(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLA
 }
 
 void sendData_dataflow(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int ORIGINAL_CLS_CNT, const unsigned int CLAUSE_PAGE_SIZE, 
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1, hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream2, 
@@ -194,7 +194,7 @@ void sendData_dataflow(ap_uint<128>* clauseStore, const clauseMetaData mCmd[_FPG
 }
 
 void saveData(ap_uint<128>* clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     mmuStream<unsigned int, _MAX_PAGES_CLS_STORE_>& freeClsPageAddresses,
     const clauseMetaData cmd, const unsigned int CLAUSE_PAGE_SIZE, hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1,
@@ -316,7 +316,7 @@ void deleteClauses(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID, mmuStream<unsig
     hls::stream<cls>& removeIDStream, hls::stream<ap_uint<96>>& intermediateStream,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
     const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int CLAUSE_PAGE_SIZE){
 #else
@@ -325,7 +325,7 @@ void deleteClauses(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID, mmuStream<unsig
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
     const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore, 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int CLAUSE_PAGE_SIZE){
 #endif
@@ -435,7 +435,7 @@ void delete_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
     hls::stream<ap_axiu<96,0,0,0>>& clauseStoreInputStream1,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
     const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore, 
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int removeTotal, const unsigned int CLAUSE_PAGE_SIZE){
     #pragma HLS inline off
@@ -463,7 +463,7 @@ void deleteClauses_wrapper(mmuStream<cls, _FPGA_MAX_CLAUSES>& freeClsID,
     hls::stream<ap_axiu<32,0,0,0>>& clauseStoreOutputStream1, hls::stream<ap_axiu<64,0,0,0>>& locationInputStream,
     cls* usedClsIDBuckets, minimumStreamTracker tracker[_FPGA_MAX_LBD_BUCKETS], cls lastInsertedID,
     const clauseMetaData mCmd[_FPGA_MAX_CLAUSES], ap_uint<128>* clauseStore,
-    ap_uint<128> mClsStore[_FPGA_MAX_LITERAL_ELEMENTS/4],
+    ap_uint<128> *mClsStore,
     ClsCacheData &clsCacheData,
     const unsigned int removeTotal, const unsigned int CLAUSE_PAGE_SIZE, unsigned int LBDBucketCount[_FPGA_MAX_LBD_BUCKETS]){
     #pragma HLS inline off
