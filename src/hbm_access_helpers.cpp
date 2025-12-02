@@ -42,9 +42,8 @@ ap_uint<128> hbm_read_clause_element(
         // Cache miss - fetch from HBM
         ap_uint<128> fetched = reg(reg(hbm_clauseStore[addr]));
         
-        // Find replacement candidate (simple: first invalid or use way 0)
+        // Find replacement candidate (simple: first invalid or LRU)
         unsigned int replace_way = 0;
-        bool found_invalid = false;
         
         FIND_REPLACEMENT:
         for (unsigned int way = 0; way < NUM_WAYS; way++) {
@@ -52,10 +51,10 @@ ap_uint<128> hbm_read_clause_element(
             unsigned int cache_index = base_index + way;
             if (!clsCacheData.cache_bits[cache_index][0]) {
                 replace_way = way;
-                found_invalid = true;
                 break;
             }
         }
+        // If all valid, replace_way stays 0 (could add LRU counter here)
         
         unsigned int victim_index = base_index + replace_way;
         
@@ -113,9 +112,8 @@ void hbm_write_clause_element(
     else {
         // Cache miss - need to allocate line
         
-        // Find replacement candidate (simple: first invalid or use way 0)
+        // Find replacement candidate (simple: first invalid or LRU)
         unsigned int replace_way = 0;
-        bool found_invalid = false;
         
         FIND_REPLACEMENT_WRITE:
         for (unsigned int way = 0; way < NUM_WAYS; way++) {
@@ -123,10 +121,10 @@ void hbm_write_clause_element(
             unsigned int cache_index = base_index + way;
             if (!clsCacheData.cache_bits[cache_index][0]) {
                 replace_way = way;
-                found_invalid = true;
                 break;
             }
         }
+        // If all valid, replace_way stays 0 (could add LRU counter here)
         
         unsigned int victim_index = base_index + replace_way;
         
