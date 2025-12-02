@@ -1,7 +1,7 @@
 #include "hbm_access_helpers.h"
 
 // Configuration for set-associative cache
-#define NUM_WAYS 4  // Number of ways (associativity)
+#define NUM_WAYS 2  // Number of ways (associativity)
 #define NUM_SETS (CACHE_SIZE / NUM_WAYS)  // Number of sets
 
 // Read single clause element from HBM with set-associative cache
