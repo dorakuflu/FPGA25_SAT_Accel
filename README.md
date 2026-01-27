@@ -1,10 +1,12 @@
 # FPGA25_artifact
+## Known Issues:
+* Hardware builds are currently not supported due to lack of support by AWS F2. Therefore, the design was tested using hardware emulation only. Refer to [Vitis Errata](https://awsdocs-fpga-f2.readthedocs-hosted.com/latest/vitis/ERRATA.html#vitis-2025-1-and-2024-2).
 ## Instructions:
 
 Following needs to be installed and is the version used for our design:  
 -XRT version 2.14.384  
--Vitis version 2022.2  
--xilinx_u55c_gen3x16_xdma_3_202210_1 platform  
+-Vitis version 2025.1  
+-xilinx_aws-vu47p-f2_202420_2 platform  
 -gcc/g++ version 10+  
 
 Provided is a shell script (./runCompile.sh) to compile the HLS code to generate the bitstream.
